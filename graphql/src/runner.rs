@@ -21,6 +21,11 @@ use graph::{
     data::query::{QueryResults, QueryTarget},
     prelude::QueryStore,
 };
+use graphql_tools::validation::rules::{
+    FragmentsOnCompositeTypes, KnownFragmentNamesRule, LeafFieldSelections, LoneAnonymousOperation,
+    NoUnusedFragments, OverlappingFieldsCanBeMerged,
+};
+use graphql_tools::validation::validate::ValidationPlan;
 
 use lazy_static::lazy_static;
 
@@ -77,6 +82,7 @@ pub struct GraphQlRunner<S, SM> {
     subscription_manager: Arc<SM>,
     load_manager: Arc<LoadManager>,
     result_size: Arc<ResultSizeMetrics>,
+    pub graphql_validation_plan: Arc<ValidationPlan>,
 }
 
 lazy_static! {
@@ -86,6 +92,10 @@ lazy_static! {
             u64::from_str(&s)
                 .unwrap_or_else(|_| panic!("failed to parse env var GRAPH_GRAPHQL_QUERY_TIMEOUT"))
         ));
+    static ref DISABLE_GRAPHQL_VALIDATIONS: bool = std::env::var("DISABLE_GRAPHQL_VALIDATIONS")
+        .unwrap_or_else(|_| "false".into())
+        .parse::<bool>()
+        .unwrap_or_else(|_| false);
     static ref GRAPHQL_MAX_COMPLEXITY: Option<u64> = env::var("GRAPH_GRAPHQL_MAX_COMPLEXITY")
         .ok()
         .map(|s| u64::from_str(&s)
@@ -135,12 +145,24 @@ where
     ) -> Self {
         let logger = logger.new(o!("component" => "GraphQlRunner"));
         let result_size = Arc::new(ResultSizeMetrics::new(registry));
+        let mut graphql_validation_plan = ValidationPlan { rules: Vec::new() };
+
+        if !(*DISABLE_GRAPHQL_VALIDATIONS) {
+            graphql_validation_plan.add_rule(Box::new(LoneAnonymousOperation {}));
+            graphql_validation_plan.add_rule(Box::new(FragmentsOnCompositeTypes {}));
+            graphql_validation_plan.add_rule(Box::new(OverlappingFieldsCanBeMerged {}));
+            graphql_validation_plan.add_rule(Box::new(KnownFragmentNamesRule {}));
+            graphql_validation_plan.add_rule(Box::new(NoUnusedFragments {}));
+            graphql_validation_plan.add_rule(Box::new(LeafFieldSelections {}));
+        }
+
         GraphQlRunner {
             logger,
             store,
             subscription_manager,
             load_manager,
             result_size,
+            graphql_validation_plan: Arc::new(graphql_validation_plan),
         }
     }
 
@@ -212,6 +234,7 @@ where
             schema,
             network,
             query,
+            self.graphql_validation_plan.clone(),
             max_complexity,
             max_depth,
         )?;
@@ -317,6 +340,7 @@ where
             schema,
             Some(network.clone()),
             subscription.query,
+            self.graphql_validation_plan.clone(),
             *GRAPHQL_MAX_COMPLEXITY,
             *GRAPHQL_MAX_DEPTH,
         )?;

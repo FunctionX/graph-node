@@ -1,3 +1,4 @@
+use graphql_tools::validation::validate::ValidationPlan;
 use http::header::{
     self, ACCESS_CONTROL_ALLOW_HEADERS, ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN,
     CONTENT_TYPE, LOCATION,
@@ -113,7 +114,15 @@ where
             .await?;
 
         let query = IndexNodeRequest::new(body).compat().await?;
-        let query = match PreparedQuery::new(&self.logger, schema, None, query, None, 100) {
+        let query = match PreparedQuery::new(
+            &self.logger,
+            schema,
+            None,
+            query,
+            Arc::new(ValidationPlan { rules: vec![] }),
+            None,
+            100,
+        ) {
             Ok(query) => query,
             Err(e) => return Ok(QueryResults::from(QueryResult::from(e)).as_http_response()),
         };

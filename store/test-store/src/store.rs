@@ -24,6 +24,7 @@ use graph_store_postgres::{
     BlockStore as DieselBlcokStore, DeploymentPlacer, SubgraphStore as DieselSubgraphStore,
     PRIMARY_SHARD,
 };
+use graphql_tools::validation::validate::ValidationPlan;
 use hex_literal::hex;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
@@ -399,6 +400,7 @@ async fn execute_subgraph_query_internal(
         schema,
         network,
         query,
+        Arc::new(ValidationPlan { rules: vec![] }),
         max_complexity,
         100
     ));

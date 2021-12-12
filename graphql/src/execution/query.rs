@@ -1,4 +1,5 @@
 use graphql_parser::Pos;
+use graphql_tools::validation::validate::{validate, ValidationPlan};
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
@@ -9,11 +10,10 @@ use graph::data::graphql::{
     ext::{DocumentExt, TypeExt},
     ObjectOrInterface,
 };
+use graph::data::query::QueryExecutionError;
 use graph::data::query::{Query as GraphDataQuery, QueryVariables};
 use graph::data::schema::ApiSchema;
-use graph::prelude::{
-    info, o, q, r, s, BlockNumber, CheapClone, Logger, QueryExecutionError, TryFromValue,
-};
+use graph::prelude::{info, o, q, r, s, BlockNumber, CheapClone, Logger, TryFromValue};
 
 use crate::introspection::introspection_schema;
 use crate::query::{ast as qast, ext::BlockConstraint};
@@ -112,9 +112,24 @@ impl Query {
         schema: Arc<ApiSchema>,
         network: Option<String>,
         query: GraphDataQuery,
+        validation_plan: Arc<ValidationPlan>,
         max_complexity: Option<u64>,
         max_depth: u8,
     ) -> Result<Arc<Self>, Vec<QueryExecutionError>> {
+        let validation_errors = validate(&schema.document(), &query.document, &validation_plan);
+
+        if validation_errors.len() > 0 {
+            return Err(validation_errors
+                .into_iter()
+                .map(|e| {
+                    QueryExecutionError::ValidationError(
+                        e.locations.clone().into_iter().nth(0),
+                        e.message,
+                    )
+                })
+                .collect());
+        }
+
         let mut operation = None;
         let mut fragments = HashMap::new();
         for defn in query.document.definitions.into_iter() {

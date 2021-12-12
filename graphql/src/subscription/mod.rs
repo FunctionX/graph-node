@@ -5,6 +5,7 @@ use std::time::{Duration, Instant};
 
 use graph::components::store::UnitStream;
 use graph::{components::store::SubscriptionManager, prelude::*};
+use graphql_tools::validation::validate::ValidationPlan;
 
 use crate::runner::ResultSizeMetrics;
 use crate::{
@@ -51,6 +52,7 @@ pub fn execute_subscription(
         schema,
         None,
         subscription.query,
+        Arc::new(ValidationPlan { rules: vec![] }),
         options.max_complexity,
         options.max_depth,
     )?;
