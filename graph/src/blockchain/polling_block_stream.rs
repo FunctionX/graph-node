@@ -328,7 +328,7 @@ where
 
             // Start with first block after subgraph ptr; if the ptr is None,
             // then we start with the genesis block
-            let from = subgraph_ptr.map_or(0, |ptr| ptr.number + 1);
+            let from = subgraph_ptr.map_or(str::parse(std::env::var("GRAPH_ETHEREUM_GENESIS_BLOCK_NUMBER").unwrap_or(String::from("0")).as_str()).unwrap_or(0), |ptr| ptr.number + 1);
 
             // Get the next subsequent data source start block to ensure the block
             // range is aligned with data source. This is not necessary for
