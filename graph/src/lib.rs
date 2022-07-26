@@ -20,6 +20,8 @@ pub mod ipfs_client;
 
 pub mod blockchain;
 
+pub mod offchain;
+
 pub mod runtime;
 
 pub mod firehose;
@@ -41,6 +43,7 @@ pub use prometheus;
 pub use semver;
 pub use slog;
 pub use stable_hash_legacy;
+pub use tokio;
 pub use tokio_stream;
 pub use url;
 
